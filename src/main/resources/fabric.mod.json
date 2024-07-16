@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "geotools",
+	"version": "${version}",
+	"name": "GeoTools",
+	"description": "Client side tools for the geocraft.nl server.",
+	"authors": [
+		"jop02"
+	],
+	"contact": {
+		"homepage": "https://github.com/jobpaardekooper/geotools",
+		"sources": "https://github.com/jobpaardekooper/geotools"
+	},
+	"license": "MIT",
+	"icon": "assets/geotools/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"nl.c1rcu1tb04rd.minecraft.geotools.GeoTools"
+		],
+		"client": [
+			"nl.c1rcu1tb04rd.minecraft.geotools.GeoToolsClient"
+		]
+	},
+	"mixins": [
+		"geotools.mixins.json",
+		{
+			"config": "geotools.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.15.11",
+		"minecraft": "~1.21",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
+}
