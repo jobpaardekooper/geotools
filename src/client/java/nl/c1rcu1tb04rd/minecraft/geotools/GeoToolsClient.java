@@ -23,6 +23,7 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.World;
 import org.lwjgl.opengl.GL11;
 
@@ -154,9 +155,50 @@ public class GeoToolsClient implements ClientModInitializer {
 
 			return result;
 		} else {
-			// Sort corners by x and z coordinates for a plane
-			return sortFaceCorners(corners);
+
+			return fixPlanePerfectDiagonal(sortFaceCorners(corners));
 		}
+	}
+
+	// This method fixed an issue where corners would be incorrectly connected when:
+	// 2 blocks have the same X and Z coordinate (with different Y coordinates) while the other 2 blocks also have the same X and Z coordinate as each other (with different Y coordinates).
+	private static List<BlockPos> fixPlanePerfectDiagonal(List<BlockPos> blockPosList) {
+		if (blockPosList.size() != 4) {
+			throw new IllegalArgumentException("List must contain exactly 4 BlockPos elements");
+		}
+
+		// Group blocks by their X and Z coordinates
+		List<BlockPos> group1 = new ArrayList<>();
+		List<BlockPos> group2 = new ArrayList<>();
+
+		group1.add(blockPosList.get(0));
+		for (int i = 1; i < blockPosList.size(); i++) {
+			BlockPos pos = blockPosList.get(i);
+			if (pos.getX() == group1.get(0).getX() && pos.getZ() == group1.get(0).getZ()) {
+				group1.add(pos);
+			} else {
+				group2.add(pos);
+			}
+		}
+
+		// Check if we have two valid groups
+		if (group1.size() == 2 && group2.size() == 2) {
+			List<BlockPos> newBlockPosList = new ArrayList<>();
+
+			// Sort each group by Y coordinate
+			group1.sort(Comparator.comparingInt(Vec3i::getY));
+			group2.sort(Comparator.comparingInt(Vec3i::getY));
+
+			// Clear the original list and add the sorted groups
+			newBlockPosList.add(group2.get(1));
+			newBlockPosList.add(group1.get(1));
+			newBlockPosList.add(group1.get(0));
+			newBlockPosList.add(group2.get(0));
+
+			return newBlockPosList;
+		}
+
+		return blockPosList;
 	}
 
 	private List<BlockPos> sortFaceCorners(List<BlockPos> faceCorners) {
