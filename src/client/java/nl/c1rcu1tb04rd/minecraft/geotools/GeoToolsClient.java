@@ -47,10 +47,10 @@ public class GeoToolsClient implements ClientModInitializer {
 	private void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher, CommandRegistryAccess commandRegistryAccess) {
 		final LiteralCommandNode<FabricClientCommandSource> selectCommandNode = dispatcher.register(ClientCommandManager.literal("select")
 				.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("type", StringArgumentType.word())
-						.suggests((context, builder) -> builder.suggest("cuboid").suggest("plane").buildFuture())
+						.suggests((context, builder) -> builder.suggest("cuboid").suggest("plane").suggest("curve").buildFuture())
 						.executes(context -> {
 							String type = StringArgumentType.getString(context, "type");
-							if ("cuboid".equals(type) || "plane".equals(type)) {
+							if ("cuboid".equals(type) || "plane".equals(type) || "curve".equals(type)) {
 								startSelection(context.getSource(), type);
 							} else {
 								context.getSource().sendFeedback(Text.of("Unknown selection type"));
@@ -62,7 +62,14 @@ public class GeoToolsClient implements ClientModInitializer {
 							clearSelection();
 							context.getSource().sendFeedback(Text.of("Selection cleared"));
 							return 1;
-						})));
+						}))
+				.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("stop")
+				.executes(context -> {
+					selectionActive = false;
+					context.getSource().sendFeedback(Text.of("Selection finished"));
+					return 1;
+				})));
+
 
 		dispatcher.register(ClientCommandManager.literal("sel").redirect(selectCommandNode));
 	}
@@ -71,7 +78,20 @@ public class GeoToolsClient implements ClientModInitializer {
 		selectedCorners.clear();
 		selectionActive = true;
 		selectionType = type;
-		source.sendFeedback(Text.of("Selection started. Click " + (type.equals("cuboid") ? "8" : "4") + " blocks to define the " + type + "."));
+		int blockCount = -1;
+		if (type.equals("cuboid")) {
+			blockCount = 8;
+		}
+		else if (type.equals("plane")) {
+			blockCount = 4;
+		}
+		else if (type.equals("curve")) {
+			source.sendFeedback(Text.of("Selection started. Click blocks to define the " + type + ". When you are done, type '/selection stop'"));
+		}
+
+		if (blockCount != -1) {
+			source.sendFeedback(Text.of("Selection started. Click " + blockCount + " blocks to define the " + type + "."));
+		}
 	}
 
 	private void clearSelection() {
@@ -85,12 +105,18 @@ public class GeoToolsClient implements ClientModInitializer {
 			return ActionResult.PASS;
 		}
 
-		int requiredCorners = selectionType.equals("cuboid") ? 8 : 4;
-		if (selectionActive && selectedCorners.size() < requiredCorners) {
+		int requiredCorners = -1;
+		if (selectionType.equals("cuboid")) {
+			requiredCorners = 8;
+		} else if (selectionType.equals("plane")) {
+			requiredCorners = 4;
+		}
+
+		if (selectionActive && (selectedCorners.size() < requiredCorners || requiredCorners == -1)) {
 			BlockPos pos = hitResult.getBlockPos();
 			selectedCorners.add(pos);
 			player.sendMessage(Text.of("Block selected: " + pos.toShortString()), false);
-			if (selectedCorners.size() == requiredCorners) {
+			if (requiredCorners != -1 && selectedCorners.size() == requiredCorners) {
 				selectionActive = false;
 				player.sendMessage(Text.of(selectionType.substring(0, 1).toUpperCase() + selectionType.substring(1) + " selection completed."), false);
 			}
@@ -107,8 +133,15 @@ public class GeoToolsClient implements ClientModInitializer {
 
 		drawCorners(context.matrixStack(), context.camera());
 
-		int requiredCorners = selectionType.equals("cuboid") ? 8 : 4;
-		if (selectedCorners.size() != requiredCorners) {
+		// TODO: Resuse this code (onBlockUse also has this)
+		int requiredCorners = -1;
+		if (selectionType.equals("cuboid")) {
+			requiredCorners = 8;
+		} else if (selectionType.equals("plane")) {
+			requiredCorners = 4;
+		}
+
+		if (selectedCorners.size() != requiredCorners && requiredCorners != -1) {
 			return;
 		}
 
@@ -132,7 +165,35 @@ public class GeoToolsClient implements ClientModInitializer {
 			BlockPos corner4 = sortedCorners.get(3);
 
 			drawPlaneOutline(context.matrixStack(), context.camera(), corner1, corner2, corner3, corner4);
+		} else if (selectionType.equals("curve")) {
+			int segments = 100; // Number of segments between each pair of points
+			List<BlockPos> splinePoints = SplineUtil.generateSpline(sortedCorners, segments);
+			renderBlocks(context.matrixStack(), context.camera(), splinePoints);
 		}
+	}
+
+	private void renderBlocks(MatrixStack matrixStack, Camera camera, List<BlockPos> blocks) {
+		Vec3d cameraPos = camera.getPos();
+		matrixStack.push();
+		matrixStack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
+
+		RenderSystem.disableDepthTest(); // Disable depth testing
+		RenderSystem.enableBlend(); // Enable blending
+		RenderSystem.defaultBlendFunc(); // Set the default blend function
+
+		VertexConsumerProvider.Immediate vertexConsumers = MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers();
+		VertexConsumer vertexConsumer = vertexConsumers.getBuffer(OutlineBoxRenderType.OVERLAY_LINES);
+
+		for (BlockPos block: blocks) {
+			drawBlockOutline(matrixStack, vertexConsumer, block, false);
+		}
+
+		vertexConsumers.draw();
+
+		RenderSystem.enableDepthTest(); // Re-enable depth testing
+		RenderSystem.disableBlend(); // Disable blending
+
+		matrixStack.pop();
 	}
 
 	private List<BlockPos> sortCorners(List<BlockPos> corners) {
@@ -154,9 +215,12 @@ public class GeoToolsClient implements ClientModInitializer {
 			result.addAll(topCorners);
 
 			return result;
-		} else {
+		} else if (selectionType.equals("plane")) {
 
 			return fixPlanePerfectDiagonal(sortFaceCorners(corners));
+		}
+		else {
+			return corners;
 		}
 	}
 

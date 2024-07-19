@@ -31,10 +31,22 @@ Dit command kan je gebruiken om een 2D vak te markeren. Na het invullen van het 
 Dit command kan je gebruiken om een 3D kubusvormige omlijning te maken. Na het invullen van het command kan je met rechtermuisknop 8 puntent selecteren voor de omlijning.
 
 ```
+/select curve
+```
+
+Dit command kan je gebruiken om een gebogen lijn te trekken door een aantal punten.
+
+```
+/select stop
+```
+
+Dit command kan je gebruiken om je selectie te beeindigen bijvoorbeeld als je klaar bent met een curve selectie.
+
+```
 /select clear
 ```
 
-Dit command kan je gebruiken om je huidige selectie te verwijderen.
+Dit command kan je gebruiken om de selectie weer weg te halen.
 
 ### Tip
 
