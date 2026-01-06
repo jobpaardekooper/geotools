@@ -114,13 +114,28 @@ public class GeoToolsClient implements ClientModInitializer {
 	private void onRenderWorld(WorldRenderContext context) {
 		if (selectedCorners.isEmpty()) return;
 
-		// Build render set: corners in green, everything else in red.
+		// Green = clicked control points
 		Set<BlockPos> green = new HashSet<>(selectedCorners);
 		Set<BlockPos> red = new HashSet<>();
 
+		if ("curve".equals(selectionType)) {
+			// Old behavior: always show the spline as soon as we have enough points,
+			// even while selectionActive and also after /select stop.
+			if (selectedCorners.size() >= 2) {
+				int segments = 100; // same as old code
+				List<BlockPos> sorted = sortCorners(new ArrayList<>(selectedCorners), selectionType);
+				List<BlockPos> splinePoints = SplineUtil.generateSpline(sorted, segments);
+				red.addAll(splinePoints);
+			}
+
+			red.removeAll(green);
+			outlineRenderer.render(context, green, red);
+			return;
+		}
+
+		// Cuboid/plane: keep your current “only show edges when complete” logic.
 		int requiredCorners = requiredCornerCount(selectionType);
 		if (requiredCorners != -1 && selectedCorners.size() == requiredCorners) {
-			// If selection complete, also outline blocks along the edges (your Bresenham logic).
 			List<BlockPos> sorted = sortCorners(new ArrayList<>(selectedCorners), selectionType);
 
 			if (selectionType.equals("cuboid")) {
@@ -128,7 +143,7 @@ public class GeoToolsClient implements ClientModInitializer {
 			} else if (selectionType.equals("plane")) {
 				addEdgeBlocksPlane(sorted, red);
 			}
-			// Ensure corners stay green
+
 			red.removeAll(green);
 		}
 
