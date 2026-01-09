@@ -13,7 +13,7 @@ import java.util.Set;
 
 public final class OutlineRenderer {
 
-    public void render(WorldRenderContext context, Set<BlockPos> green, Set<BlockPos> red) {
+    public static void render(WorldRenderContext context, Set<BlockPos> green, Set<BlockPos> red) {
         if ((green == null || green.isEmpty()) && (red == null || red.isEmpty())) return;
 
         // IMPORTANT: In the .world API you generally buffer into the context's consumers.

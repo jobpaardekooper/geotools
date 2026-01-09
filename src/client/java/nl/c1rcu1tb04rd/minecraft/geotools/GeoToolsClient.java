@@ -10,7 +10,6 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
@@ -27,44 +26,39 @@ public class GeoToolsClient implements ClientModInitializer {
 	private static boolean selectionActive = false;
 	private static String selectionType = "";
 
-	private final OutlineRenderer outlineRenderer = new OutlineRenderer();
-
 	@Override
 	public void onInitializeClient() {
 		ClientCommandRegistrationCallback.EVENT.register(this::registerCommands);
 		UseBlockCallback.EVENT.register(this::onBlockUse);
-
-		// IMPORTANT: With the .world API, do the extraction+draw in a supported phase.
 		WorldRenderEvents.BEFORE_TRANSLUCENT.register(this::onRenderWorld);
 	}
 
 	private void registerCommands(CommandDispatcher<FabricClientCommandSource> dispatcher, net.minecraft.command.CommandRegistryAccess commandRegistryAccess) {
-		final LiteralCommandNode<FabricClientCommandSource> selectCommandNode = dispatcher.register(
-				ClientCommandManager.literal("select")
-						.then(ClientCommandManager.argument("type", StringArgumentType.word())
-								.suggests((context, builder) -> builder.suggest("cuboid").suggest("plane").suggest("curve").buildFuture())
-								.executes(context -> {
-									String type = StringArgumentType.getString(context, "type");
-									if ("cuboid".equals(type) || "plane".equals(type) || "curve".equals(type)) {
-										startSelection(context.getSource(), type);
-									} else {
-										context.getSource().sendFeedback(Text.of("Unknown selection type"));
-									}
-									return 1;
-								}))
-						.then(ClientCommandManager.literal("clear")
-								.executes(context -> {
-									clearSelection();
-									context.getSource().sendFeedback(Text.of("Selection cleared"));
-									return 1;
-								}))
-						.then(ClientCommandManager.literal("stop")
-								.executes(context -> {
-									selectionActive = false;
-									context.getSource().sendFeedback(Text.of("Selection finished"));
-									return 1;
-								}))
-		);
+		final LiteralCommandNode<FabricClientCommandSource> selectCommandNode = dispatcher.register(ClientCommandManager.literal("select")
+				.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument("type", StringArgumentType.word())
+						.suggests((context, builder) -> builder.suggest("cuboid").suggest("plane").suggest("curve").buildFuture())
+						.executes(context -> {
+							String type = StringArgumentType.getString(context, "type");
+							if ("cuboid".equals(type) || "plane".equals(type) || "curve".equals(type)) {
+								startSelection(context.getSource(), type);
+							} else {
+								context.getSource().sendFeedback(Text.of("Unknown selection type"));
+							}
+							return 1;
+						}))
+				.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("clear")
+						.executes(context -> {
+							clearSelection();
+							context.getSource().sendFeedback(Text.of("Selection cleared"));
+							return 1;
+						}))
+				.then(net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal("stop")
+						.executes(context -> {
+							selectionActive = false;
+							context.getSource().sendFeedback(Text.of("Selection finished"));
+							return 1;
+						})));
+
 
 		dispatcher.register(ClientCommandManager.literal("sel").redirect(selectCommandNode));
 	}
@@ -73,15 +67,19 @@ public class GeoToolsClient implements ClientModInitializer {
 		selectedCorners.clear();
 		selectionActive = true;
 		selectionType = type;
-
 		int blockCount = -1;
-		if (type.equals("cuboid")) blockCount = 8;
-		else if (type.equals("plane")) blockCount = 4;
+		if (type.equals("cuboid")) {
+			blockCount = 8;
+		}
+		else if (type.equals("plane")) {
+			blockCount = 4;
+		}
+		else if (type.equals("curve")) {
+			source.sendFeedback(Text.of("Selection started. Click blocks to define the " + type + ". When you are done, type '/selection stop'"));
+		}
 
 		if (blockCount != -1) {
 			source.sendFeedback(Text.of("Selection started. Click " + blockCount + " blocks to define the " + type + "."));
-		} else {
-			source.sendFeedback(Text.of("Selection started. Click blocks to define the " + type + ". When done: '/select stop'"));
 		}
 	}
 
@@ -92,22 +90,27 @@ public class GeoToolsClient implements ClientModInitializer {
 	}
 
 	private ActionResult onBlockUse(PlayerEntity player, World world, Hand hand, BlockHitResult hitResult) {
-		if (!world.isClient()) return ActionResult.PASS;
+		if (!world.isClient()) {
+			return ActionResult.PASS;
+		}
 
-		int requiredCorners = requiredCornerCount(selectionType);
+		int requiredCorners = -1;
+		if (selectionType.equals("cuboid")) {
+			requiredCorners = 8;
+		} else if (selectionType.equals("plane")) {
+			requiredCorners = 4;
+		}
 
-		if (selectionActive && (requiredCorners == -1 || selectedCorners.size() < requiredCorners)) {
+		if (selectionActive && (selectedCorners.size() < requiredCorners || requiredCorners == -1)) {
 			BlockPos pos = hitResult.getBlockPos();
-			selectedCorners.add(pos.toImmutable());
+			selectedCorners.add(pos);
 			player.sendMessage(Text.of("Block selected: " + pos.toShortString()), false);
-
 			if (requiredCorners != -1 && selectedCorners.size() == requiredCorners) {
 				selectionActive = false;
 				player.sendMessage(Text.of(selectionType.substring(0, 1).toUpperCase() + selectionType.substring(1) + " selection completed."), false);
 			}
 			return ActionResult.FAIL;
 		}
-
 		return ActionResult.PASS;
 	}
 
@@ -129,7 +132,7 @@ public class GeoToolsClient implements ClientModInitializer {
 			}
 
 			red.removeAll(green);
-			outlineRenderer.render(context, green, red);
+			OutlineRenderer.render(context, green, red);
 			return;
 		}
 
@@ -147,7 +150,7 @@ public class GeoToolsClient implements ClientModInitializer {
 			red.removeAll(green);
 		}
 
-		outlineRenderer.render(context, green, red);
+		OutlineRenderer.render(context, green, red);
 	}
 
 	private static int requiredCornerCount(String selectionType) {
@@ -162,18 +165,30 @@ public class GeoToolsClient implements ClientModInitializer {
 
 	private static List<BlockPos> sortCorners(List<BlockPos> corners, String selectionType) {
 		if (selectionType.equals("cuboid")) {
+			// Sort corners by y-coordinate
 			corners.sort(Comparator.comparingInt(BlockPos::getY));
-			List<BlockPos> bottom = sortFaceCorners(new ArrayList<>(corners.subList(0, 4)));
-			List<BlockPos> top = sortFaceCorners(new ArrayList<>(corners.subList(4, 8)));
-			List<BlockPos> out = new ArrayList<>(8);
-			out.addAll(bottom);
-			out.addAll(top);
-			return out;
-		}
-		if (selectionType.equals("plane")) {
+
+			// Select the first 4 corners as the bottom face and the remaining 4 as the top face
+			List<BlockPos> bottomCorners = new ArrayList<>(corners.subList(0, 4));
+			List<BlockPos> topCorners = new ArrayList<>(corners.subList(4, 8));
+
+			// Sort the corners within each face
+			bottomCorners = sortFaceCorners(bottomCorners);
+			topCorners = sortFaceCorners(topCorners);
+
+			// Combine the sorted corners of the bottom and top faces
+			List<BlockPos> result = new ArrayList<>(8);
+			result.addAll(bottomCorners);
+			result.addAll(topCorners);
+
+			return result;
+		} else if (selectionType.equals("plane")) {
+
 			return fixPlanePerfectDiagonal(sortFaceCorners(corners));
 		}
-		return corners;
+		else {
+			return corners;
+		}
 	}
 
 	private static List<BlockPos> sortFaceCorners(List<BlockPos> faceCorners) {
@@ -189,26 +204,45 @@ public class GeoToolsClient implements ClientModInitializer {
 		return faceCorners;
 	}
 
-	private static List<BlockPos> fixPlanePerfectDiagonal(List<BlockPos> list) {
-		if (list.size() != 4) throw new IllegalArgumentException("List must contain exactly 4 BlockPos elements");
+	// This method fixed an issue where corners would be incorrectly connected when:
+	// 2 blocks have the same X and Z coordinate (with different Y coordinates) while the other 2 blocks also have the same X and Z coordinate as each other (with different Y coordinates).
+	private static List<BlockPos> fixPlanePerfectDiagonal(List<BlockPos> blockPosList) {
+		if (blockPosList.size() != 4) {
+			throw new IllegalArgumentException("List must contain exactly 4 BlockPos elements");
+		}
 
+		// Group blocks by their X and Z coordinates
 		List<BlockPos> group1 = new ArrayList<>();
 		List<BlockPos> group2 = new ArrayList<>();
 
-		group1.add(list.get(0));
-		for (int i = 1; i < list.size(); i++) {
-			BlockPos pos = list.get(i);
-			if (pos.getX() == group1.get(0).getX() && pos.getZ() == group1.get(0).getZ()) group1.add(pos);
-			else group2.add(pos);
+		group1.add(blockPosList.get(0));
+		for (int i = 1; i < blockPosList.size(); i++) {
+			BlockPos pos = blockPosList.get(i);
+			if (pos.getX() == group1.get(0).getX() && pos.getZ() == group1.get(0).getZ()) {
+				group1.add(pos);
+			} else {
+				group2.add(pos);
+			}
 		}
 
+		// Check if we have two valid groups
 		if (group1.size() == 2 && group2.size() == 2) {
+			List<BlockPos> newBlockPosList = new ArrayList<>();
+
+			// Sort each group by Y coordinate
 			group1.sort(Comparator.comparingInt(Vec3i::getY));
 			group2.sort(Comparator.comparingInt(Vec3i::getY));
-			return List.of(group2.get(1), group1.get(1), group1.get(0), group2.get(0));
+
+			// Clear the original list and add the sorted groups
+			newBlockPosList.add(group2.get(1));
+			newBlockPosList.add(group1.get(1));
+			newBlockPosList.add(group1.get(0));
+			newBlockPosList.add(group2.get(0));
+
+			return newBlockPosList;
 		}
 
-		return list;
+		return blockPosList;
 	}
 
 	// ----- Edge generation (Bresenham, but add to a Set) -----
@@ -279,10 +313,5 @@ public class GeoToolsClient implements ClientModInitializer {
 			}
 		}
 		out.add(new BlockPos(x1, y1, z1));
-	}
-
-	// Expose for mixin cleanup
-	public OutlineRenderer getOutlineRenderer() {
-		return outlineRenderer;
 	}
 }
