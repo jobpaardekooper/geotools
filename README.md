@@ -5,12 +5,12 @@ Client side tools mod voor de geocraft.nl Minecraft server.
 https://github.com/user-attachments/assets/59352646-7dbc-4afb-aecc-8dc8c953713f
 
 ## Installeren
-- Installeer [Fabric](https://fabricmc.net/use/installer/) voor Minecraft `1.21`. 
+- Installeer [Fabric](https://fabricmc.net/use/installer/) voor Minecraft `1.21.11`. 
 - Installeer [ViaVersion](https://modrinth.com/plugin/viaversion/).
 - Installeer [ViaFabricPlus](https://modrinth.com/mod/viafabricplus).
 - Installeer [GeoTools](https://github.com/jobpaardekooper/geotools/releases) via de GitHub releases pagina.
 
-`ViaVersion` en `ViaFabricPlus` zijn nodig zodat je met Minecraft `1.21` (waar de mod voor is gemaakt) toch op geocraft kan.
+`ViaVersion` en `ViaFabricPlus` zijn nodig zodat je met Minecraft `1.21.11` (waar de mod voor is gemaakt) toch op geocraft kan.
 
 ## Features
 

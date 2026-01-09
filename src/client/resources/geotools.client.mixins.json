@@ -3,9 +3,11 @@
 	"package": "nl.c1rcu1tb04rd.minecraft.geotools.mixin.client",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"ExampleClientMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
 	}
 }
